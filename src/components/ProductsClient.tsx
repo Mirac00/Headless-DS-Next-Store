@@ -2,10 +2,10 @@
 
 // Import React hooks
 import { useEffect, useState } from "react";
-// Import Next.js useRouter for navigation
-import { useRouter } from "next/navigation";
+// Import Next.js hooks dla query params i nawigacji
+import { useSearchParams, useRouter } from "next/navigation";
 // Import API functions
-import { getAllProducts } from "@/services/api";
+import { getProducts } from "@/services/api";
 // Import context hook
 import { myStoreHook } from "@/context/MyStoreContext";
 // Import types
@@ -14,31 +14,114 @@ import { Product } from "@/types";
 export default function ProductsClient() {
   // Access context functions
   const { addProductsToCart, setPageLoading, renderProductPrice } = myStoreHook();
-  // State for products
+  // State dla produktów, strony i totals
   const [products, setProducts] = useState<Product[]>([]);
-  // Router instance for navigation
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalProducts, setTotalProducts] = useState(0);
+  
+  // Router i search params
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const perPage = 20; // Stała liczba produktów na stronę
 
-  // Fetch all products on mount
-  const getAllProductsData = async () => {
+  // Fetch products dla bieżącej strony
+  const fetchProducts = async (page: number) => {
     setPageLoading(true);
     try {
-      const response = await getAllProducts();
-      setProducts(response || []);
+      const response = await getProducts(page, perPage);
+      if (response) {
+        setProducts(response.products);
+        setTotalPages(response.totalPages);
+        setTotalProducts(response.total);
+      }
     } catch (error) {
-      console.error(error);
+      console.error('Error fetching products in ProductsClient:', error);
     } finally {
       setPageLoading(false);
     }
   };
 
+  // Efekt do ładowania produktów przy zmianie strony w URL
   useEffect(() => {
-    getAllProductsData();
-  }, []);
+    // Czytaj stronę z URL query (domyślnie 1)
+    const pageFromQuery = parseInt(searchParams.get('page') || '1', 10);
+    // Upewnij się, że page jest >= 1
+    if (pageFromQuery < 1) {
+      router.push('/products?page=1');
+      return;
+    }
+    setCurrentPage(pageFromQuery);
+    fetchProducts(pageFromQuery);
+  }, [searchParams]);
 
   // Navigate to single product page
   const handleSingleProductDetailsRedirection = (productId: number) => {
     router.push(`/product/${productId}`);
+  };
+
+  // Nawigacja do strony (aktualizuje URL)
+  const goToPage = (page: number) => {
+    if (page < 1 || page > totalPages) return; // Zapobiega niepoprawnym stronom
+    setCurrentPage(page);
+    router.push(`/products?page=${page}`);
+  };
+
+  // Generuj paginację
+  const renderPagination = () => {
+    const pages = [];
+    const maxVisiblePages = 5; // Pokazuj max 5 stron naraz
+    let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
+    let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+    if (endPage - startPage + 1 < maxVisiblePages) {
+      startPage = Math.max(1, endPage - maxVisiblePages + 1);
+    }
+
+    if (totalPages <= 1) return null;
+
+    // Przycisk "Poprzednia"
+    pages.push(
+      <button
+        key="prev"
+        onClick={() => goToPage(currentPage - 1)}
+        disabled={currentPage === 1}
+        className="btn btn-secondary me-2"
+      >
+        Poprzednia
+      </button>
+    );
+
+    // Numery stron
+    for (let i = startPage; i <= endPage; i++) {
+      pages.push(
+        <button
+          key={i}
+          onClick={() => goToPage(i)}
+          className={`btn ${currentPage === i ? 'btn-primary' : 'btn-outline-primary'} me-2`}
+        >
+          {i}
+        </button>
+      );
+    }
+
+    // Przycisk "Następna"
+    pages.push(
+      <button
+        key="next"
+        onClick={() => goToPage(currentPage + 1)}
+        disabled={currentPage === totalPages}
+        className="btn btn-secondary"
+      >
+        Następna
+      </button>
+    );
+
+    return (
+      <div className="d-flex justify-content-center mt-4">
+        <p className="me-3 mt-2">Strona {currentPage} z {totalPages} (Produkty: {totalProducts})</p>
+        {pages}
+      </div>
+    );
   };
 
   return (
@@ -84,6 +167,7 @@ export default function ProductsClient() {
           </div>
         ))}
       </div>
+      {renderPagination()}
     </div>
   );
 }

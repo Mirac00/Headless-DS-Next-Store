@@ -67,7 +67,51 @@ const api = axios.create({
   baseURL: API_URL,
 });
 
-// Get all products
+// Get products with pagination (POPRAWIONE: parametry query włączone do sygnatury)
+export const getProducts = async (page: number = 1, perPage: number = 20): Promise<{
+  products: Product[];
+  total: number;
+  totalPages: number;
+} | null> => {
+  try {
+    // Definiuj parametry query jako obiekt (włączane do sygnatury)
+    const queryParams: Partial<OAuthParams> = {
+      per_page: perPage.toString(),
+      page: page.toString(),
+      orderby: 'id',
+      order: 'asc'
+    };
+
+    const url = `${API_URL}/products`; // Bez query w URL - dodane poniżej
+    console.log('Fetching products from URL:', url, 'with params:', queryParams);
+
+    // Generuj sygnaturę z query params
+    const oauthParams = generateOAuthSignature(url, 'GET', queryParams);
+
+    const response = await api.get<Product[]>("/products", { 
+      params: { 
+        ...oauthParams, 
+        ...queryParams  // Dodaj query params do requestu
+      } 
+    });
+    
+    // Pobierz totals z headers (standard WP REST API)
+    const total = parseInt(response.headers['x-wp-total'] || '0', 10);
+    const totalPages = parseInt(response.headers['x-wp-totalpages'] || '1', 10);
+    
+    console.log('Products response:', { products: response.data, total, totalPages });
+    return {
+      products: response.data,
+      total,
+      totalPages
+    };
+  } catch (error: any) {
+    console.error('Error fetching products:', error.response?.data || error.message);
+    throw error;
+  }
+};
+
+// Get all products (legacy, without pagination)
 export const getAllProducts = async (): Promise<Product[] | null> => {
   try {
     console.log('Fetching products from URL:', `${API_URL}/products`);
