@@ -55,6 +55,13 @@ export default function ProductsClient() {
     fetchProducts(pageFromQuery);
   }, [searchParams]);
 
+  // Efekt do korekty niepoprawnej strony (np. page > totalPages)
+  useEffect(() => {
+    if (totalPages > 0 && currentPage > totalPages) {
+      goToPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
+
   // Navigate to single product page
   const handleSingleProductDetailsRedirection = (productId: number) => {
     router.push(`/product/${productId}`);
@@ -91,6 +98,22 @@ export default function ProductsClient() {
       </button>
     );
 
+    // Pierwsza strona i ellipsis
+    if (startPage > 1) {
+      pages.push(
+        <button
+          key={1}
+          onClick={() => goToPage(1)}
+          className={`btn ${currentPage === 1 ? 'btn-primary' : 'btn-outline-primary'} me-2`}
+        >
+          1
+        </button>
+      );
+      if (startPage > 2) {
+        pages.push(<span key="start-ellipsis" className="me-2">...</span>);
+      }
+    }
+
     // Numery stron
     for (let i = startPage; i <= endPage; i++) {
       pages.push(
@@ -100,6 +123,22 @@ export default function ProductsClient() {
           className={`btn ${currentPage === i ? 'btn-primary' : 'btn-outline-primary'} me-2`}
         >
           {i}
+        </button>
+      );
+    }
+
+    // Ostatnia strona i ellipsis
+    if (endPage < totalPages) {
+      if (endPage < totalPages - 1) {
+        pages.push(<span key="end-ellipsis" className="me-2">...</span>);
+      }
+      pages.push(
+        <button
+          key={totalPages}
+          onClick={() => goToPage(totalPages)}
+          className={`btn ${currentPage === totalPages ? 'btn-primary' : 'btn-outline-primary'} me-2`}
+        >
+          {totalPages}
         </button>
       );
     }
@@ -117,8 +156,8 @@ export default function ProductsClient() {
     );
 
     return (
-      <div className="d-flex justify-content-center mt-4">
-        <p className="me-3 mt-2">Strona {currentPage} z {totalPages} (Produkty: {totalProducts})</p>
+      <div className="d-flex justify-content-center align-items-center flex-wrap mt-4">
+        <p className="me-3">Strona {currentPage} z {totalPages} (Produkty: {totalProducts})</p>
         {pages}
       </div>
     );
